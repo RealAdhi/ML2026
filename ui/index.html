@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PathSnap - Route Reconstruction</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>PathSnap</h1>
+  <span class="sub">GPS map-matching &middot; classifier + HMM/Viterbi</span>
+  <div class="api">
+    <label for="apiUrl">API</label>
+    <input id="apiUrl" type="text" value="http://localhost:8000">
+    <button id="connect">Connect</button>
+    <span id="status" class="pill off">not connected</span>
+  </div>
+</header>
+<main>
+  <aside>
+    <h2>Evaluation trips</h2>
+    <p class="hint" id="tripHint">Connect to the API to list trips.</p>
+    <ul id="tripList"></ul>
+    <h2>Results</h2>
+    <div id="results" class="empty">Select a trip.</div>
+    <div id="timing"></div>
+  </aside>
+  <section id="mapwrap"><div id="map"></div></section>
+</main>
+<script src="vendor/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
