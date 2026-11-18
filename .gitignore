@@ -12,3 +12,9 @@ results/monitor.log
 results/models_run.log
 results/models/student_test_predictions_*.pkl
 results/models/mlp_history_*.csv
+results/ui_server.log
+results/chain.log
+results/maps_run.log
+results/figures_run.log
+results/bayes/*/oof_*.pkl
+results/bayes/*/student_test_*.pkl

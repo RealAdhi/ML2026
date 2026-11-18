@@ -83,7 +83,7 @@ if os.path.exists(hp):
     fig.tight_layout(); fig.savefig(os.path.join(fig_dir, "mlp_loss_curve.png"), dpi=140); plt.close(fig)
 
 # tuned vs untuned
-tp = os.path.join(R, "bayes", "tuned_vs_untuned.csv")
+tp = os.path.join(R, "bayes", "xgboost", "tuned_vs_untuned.csv")
 if os.path.exists(tp):
     t = pd.read_csv(tp); fig, ax = plt.subplots(1, 3, figsize=(12, 3.8))
     for a, c, ttl in zip(ax, ("cv_macro_f1", "test_top1_all", "test_log_loss"), ("CV macro-F1", "Student-test top-1", "Student-test log loss")):
@@ -95,7 +95,7 @@ if os.path.exists(tp):
 # HMM vs classifier-only
 hp = os.path.join(R, "hmm", "per_trip_student.csv")
 if os.path.exists(hp):
-    h = pd.read_csv(hp); x = np.arange(len(h)); fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+    h = pd.read_csv(hp, dtype={"trip": str}); x = np.arange(len(h)); fig, ax = plt.subplots(1, 2, figsize=(12, 4))
     ax[0].bar(x - .2, h.clf_acc, .4, label="classifier only", color="#ef5350"); ax[0].bar(x + .2, h.hmm_acc, .4, label="classifier + HMM", color="#2e7d32")
     ax[0].set_xticks(x); ax[0].set_xticklabels(h.trip.str[-3:]); ax[0].set(title="Point accuracy per student-test trip", ylim=(.7, 1)); ax[0].legend()
     ax[1].bar(x - .2, h.clf_continuity, .4, color="#ef5350"); ax[1].bar(x + .2, h.hmm_continuity, .4, color="#2e7d32")

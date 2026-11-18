@@ -33,7 +33,8 @@ EPOCH = re.compile(r"epoch (\d+): train_loss=([\d.]+) val_loss=([\d.]+)")
 
 # static pipeline order -> used for tie-breaks and for the ribbon
 ORDER = ["data", "eda"] + [f"model:{k}" for k, _ in MODELS] + ["tune:lightgbm", "tune:xgboost", "decoder", "final",
-                                                                  "api", "apicheck", "maps", "figures", "docs", "git"]
+                                                                  "api", "apicheck", "maps", "figures", "docs", "git",
+                                                                  "handoff:eda", "handoff:errors", "handoff:tests"]
 
 CPU_HIST = deque(maxlen=120)
 
@@ -90,7 +91,7 @@ def scan_processes():
                 args[c[2:]] = cmd[i + 1]
         if "uvicorn" in joined and "api" in joined:
             key = "api"
-        elif script == "monitor.py":
+        elif script in ("monitor.py", "tui.py"):
             continue
         elif script == "02_compare_models.py":
             key = f"model:{args.get('models', 'all').split(',')[0]}"
@@ -130,6 +131,33 @@ def git_state():
     remote = run("rev-parse", "origin/main")
     dirty = len(run("status", "--porcelain").splitlines())
     return dict(commits=int(commits) if commits.isdigit() else 0, pushed=bool(head) and head == remote, dirty=dirty)
+
+
+HANDOFFS = [("eda", "handoff-eda", "Teammate 1: EDA overview + findings"),
+            ("errors", "handoff-errors", "Teammate 2: error analysis"),
+            ("tests", "handoff-tests-runbook", "Teammate 3: tests + demo runbook")]
+HANDOFF_CACHE = {}
+
+
+def refresh_handoffs():
+    """git fetch (read-only) then summarise each handoff branch; called from the background thread."""
+    def run(*a):
+        try:
+            return subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True, timeout=40).stdout.strip()
+        except Exception:
+            return ""
+    run("fetch", "origin", "--quiet", "--prune")
+    for key, br, _ in HANDOFFS:
+        ref = f"origin/{br}"
+        if not run("rev-parse", "--verify", "--quiet", ref):
+            HANDOFF_CACHE[key] = dict(exists=False)
+            continue
+        info = run("log", "-1", "--format=%an|%ar|%s", ref).split("|", 2)
+        ahead = run("rev-list", "--count", f"origin/main..{ref}")
+        files = run("diff", "--name-only", f"origin/main...{ref}").splitlines()
+        merged = subprocess.run(["git", "merge-base", "--is-ancestor", ref, "origin/main"], cwd=ROOT).returncode == 0
+        HANDOFF_CACHE[key] = dict(exists=True, author=info[0] if info else "", when=info[1] if len(info) > 1 else "",
+                                  subject=info[2] if len(info) > 2 else "", ahead=int(ahead or 0), files=files, merged=merged)
 
 
 def api_listening():
@@ -184,14 +212,16 @@ def build_jobs():
     for k in sorted(tuned_models):
         log = read(os.path.join(RES, f"bayes_{k}.log"))
         trials = [(int(a), float(b)) for a, b in OPTUNA.findall(log)]
-        n_total = int((live.get(f"tune:{k}") or {}).get("args", {}).get("trials", 30))
         rows = read_csv_rows(os.path.join(RES, "bayes", k, "tuned_vs_untuned.csv"))
+        n_planned = int((live.get(f"tune:{k}") or {}).get("args", {}).get("trials", 30))
+        search_over = bool(rows) or os.path.exists(os.path.join(RES, "bayes", k, "best_params.json"))
+        n_total = len(trials) if search_over else max(n_planned, len(trials))
         done = bool(rows)
         failed = "Traceback" in log and f"tune:{k}" not in live and not done
         state = "running" if f"tune:{k}" in live else "done" if done else "failed" if failed else ("waiting" if not log else "waiting")
         if log and not done and f"tune:{k}" not in live and not failed:
             state = "waiting"
-        pct = 100 if done else min(88, round(len(trials) / n_total * 88)) if trials else (3 if state == "running" else 0)
+        pct = 100 if done else (90 if search_over else (min(88, round(len(trials) / n_total * 88)) if trials else (3 if state == "running" else 0)))
         bp = {}
         try:
             bp = json.load(open(os.path.join(RES, "bayes", k, "best_params.json")))
@@ -201,7 +231,8 @@ def build_jobs():
         jobs.append(job(f"tune:{k}", f"Optuna TPE: {MODEL_NAME.get(k, k)}", "tuning", state, trials=sorted(trials), n_total=n_total, pct=pct,
                         best=max([v for _, v in trials], default=None), best_params=bp.get("best_params"),
                         tuned=tv, error=log.strip().splitlines()[-1][:200] if failed else None,
-                        detail="maximise 5-fold group CV macro-F1", **run_info(f"tune:{k}")))
+                        detail=("search finished, comparing tuned vs untuned" if search_over and not done else "maximise 5-fold group CV macro-F1"),
+                        search_over=search_over, **run_info(f"tune:{k}")))
 
     # ---- decoder
     log = read(os.path.join(RES, "decoder_run.log"))
@@ -245,9 +276,20 @@ def build_jobs():
                     detail=f"{figs} figures", **run_info("figures")))
     jobs.append(job("docs", "README + report notes", "report", "done" if exists("README.md") else "waiting", detail="README.md"))
     g = git_state()
-    gstate = "done" if g["pushed"] and g["dirty"] == 0 and g["commits"] else ("running" if g["commits"] else "waiting")
+    gstate = "done" if g["pushed"] and g["dirty"] == 0 and g["commits"] else "waiting"
     jobs.append(job("git", "Commit + push to GitHub", "release", gstate,
                     detail=(f"{g['commits']} commits, {'pushed' if g['pushed'] else 'not pushed'}, {g['dirty']} uncommitted files")))
+
+    # ---- teammate handoff branches
+    for key, br, title in HANDOFFS:
+        h = HANDOFF_CACHE.get(key)
+        if not h or not h.get("exists"):
+            jobs.append(job(f"handoff:{key}", title, "teammate", "waiting", detail=f"no branch '{br}' on GitHub yet"))
+        else:
+            st = "done" if h["merged"] else "running"
+            jobs.append(job(f"handoff:{key}", title, "teammate", st,
+                            detail=f"{h['author']} pushed {h['when']}: {h['subject'][:60]} ({h['ahead']} commits, {len(h['files'])} files)"
+                                   + (", merged" if h["merged"] else ", awaiting review")))
 
     # ---- ad hoc processes (anything else started under scripts/)
     for key, p in live.items():
@@ -266,8 +308,12 @@ SNAPSHOT = {"jobs": [], "cpu": [], "cpu_hist": [], "cpu_avg": 0, "mem_pct": 0, "
 def _refresher():
     """Build the status in the background so HTTP requests are answered instantly from the cache."""
     global SNAPSHOT
+    last_fetch = 0.0
     while True:
         try:
+            if time.time() - last_fetch > 60:
+                last_fetch = time.time()
+                threading.Thread(target=refresh_handoffs, daemon=True).start()
             SNAPSHOT = status()
         except Exception as e:  # keep the monitor alive whatever a job's files look like
             SNAPSHOT = dict(SNAPSHOT, time="error: " + str(e)[:60])
@@ -389,7 +435,7 @@ th:first-child,td:first-child{text-align:left} td{font-family:var(--mono)} td:fi
 const $=id=>document.getElementById(id);
 const f=(x,d=4)=>x==null||isNaN(x)?'-':Number(x).toFixed(d);
 const dur=s=>s==null?'':s<60?s+'s':s<3600?Math.floor(s/60)+'m '+(s%60)+'s':Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m';
-const KIND={data:'Data',model:'Model',tuning:'Bayesian search',decoder:'Decoder',service:'Service',check:'Check',report:'Report',release:'Release',adhoc:'Script'};
+const KIND={data:'Data',model:'Model',tuning:'Bayesian search',decoder:'Decoder',service:'Service',teammate:'Teammate',check:'Check',report:'Report',release:'Release',adhoc:'Script'};
 const GROUP={running:0,failed:1,waiting:2,done:3}, GLABEL={0:'In progress',1:'Needs attention',2:'Queued',3:'Completed'};
 // theme toggle (remembered when storage is available)
 (function(){let t=null;try{t=localStorage.getItem('ps-theme')}catch(e){} if(t)document.documentElement.dataset.theme=t;

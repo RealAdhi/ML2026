@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -59,26 +59,31 @@ def _arc_polylines(trip, arcs):
 
 
 @app.get("/health")
-def health():
+def health(request: Request):
+    log.info("GET /health from %s", request.client.host if request.client else "?")
     return {"status": "ok", "model": predictor.model_name, "n_trips": len(TRIP_IDS), "data_dir": str(EVAL_DATA_DIR)}
 
 
+_TRIP_LIST = []
+
+
 @app.get("/trips")
-def trips():
-    out = []
-    for t in TRIP_IDS:
-        trip = load_trip(EVAL_DATA_DIR, t, with_route=False)
-        out.append({"trip_id": t, "n_gps": int(len(trip.t)),
-                    "center": [float(np.median(trip.lat)), float(np.median(trip.lon))]})
-    return {"trips": out}
+def trips(request: Request):
+    if not _TRIP_LIST:   # read the small .track files once; the list never changes while the server runs
+        for t in TRIP_IDS:
+            trip = load_trip(EVAL_DATA_DIR, t, with_route=False)
+            _TRIP_LIST.append({"trip_id": t, "n_gps": int(len(trip.t)),
+                               "center": [float(np.median(trip.lat)), float(np.median(trip.lon))]})
+    log.info("GET /trips from %s -> %d trips", request.client.host if request.client else "?", len(_TRIP_LIST))
+    return {"trips": _TRIP_LIST}
 
 
 @app.post("/predict")
-def predict(req: PredictRequest):
+def predict(req: PredictRequest, request: Request):
     if req.trip_id not in TRIP_IDS:
         raise HTTPException(404, f"unknown trip {req.trip_id}")
     t0 = time.time()
-    log.info("POST /predict trip_id=%s", req.trip_id)
+    log.info("POST /predict trip_id=%s from %s", req.trip_id, request.client.host if request.client else "?")
     trip, pred = predict_trip_dir(predictor, EVAL_DATA_DIR, req.trip_id)
     metrics = score(EVAL_DATA_DIR, req.trip_id, pred)          # server-side only
     seq, lines = _arc_polylines(trip, pred["arc_hmm"])
