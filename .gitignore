@@ -18,3 +18,6 @@ results/maps_run.log
 results/figures_run.log
 results/bayes/*/oof_*.pkl
 results/bayes/*/student_test_*.pkl
+.pytest_cache/
+results/models/comparison_*.csv
+results/models/cv_folds_*.csv

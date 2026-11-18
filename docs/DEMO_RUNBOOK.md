@@ -51,6 +51,8 @@ set EVAL_DATA_DIR=C:\path\to\evaluator_trips
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
+Simpler: `python scripts/run_api.py` (add `--data C:/path/to/evaluator_trips` to serve another folder). It starts the same server and prints Laptop 1's addresses and the exact URLs to open on Laptop 2.
+
 Leave this command window open so the evaluator can see API logs. On Laptop 2, first open `http://<LAPTOP-1-IP>:8000/health` in a browser. The page should show JSON containing `"status":"ok"`.
 
 ## 5. Start the UI on Laptop 2
@@ -115,3 +117,17 @@ Part 3 is pending the lead's ready message. After that run, add the real API log
 | Trip | Worked? (yes/no) | Time (s) |
 |---|---|---|
 | Pending dry-run | — | — |
+
+
+## 12. Evaluator day (part 2): the ten reserved trips
+
+Rules that apply: **no training, no tuning, no code edits.** The evaluator trips are used only for inference with the model already committed in `models/final/`. Their ground truth stays on Laptop 1.
+
+1. **Laptop 1 is the host.** Put the evaluator folder **outside the repository** (for example `C:\evaluator_trips`) so it can never be committed. Layout must be `<id>/<id>.track`, `.nodes`, `.arcs`, `.route`.
+2. **Hotspot.** Join both laptops to the same phone hotspot (it also gives Laptop 2 the internet access the map tiles need). Read Laptop 1's IPv4 address from `ipconfig` after connecting; it can change every time the hotspot reconnects.
+3. **Start the API on Laptop 1** from the repository root: `python scripts/run_api.py --data C:\evaluator_trips`. In the banner, check that the data folder is the evaluator folder.
+4. **Check the trip count.** Open `http://<LAPTOP-1-IP>:8000/health` from Laptop 2. `n_trips` must be 10. If it is 0, the folder path or layout is wrong.
+5. **Start the UI on Laptop 2** and open `http://localhost:5500/?api=http://<LAPTOP-1-IP>:8000`. Confirm the ten trips are listed.
+6. **Demo.** Let the evaluator pick any trip. Show the result in the UI, then show the Laptop 1 window: each request logs the trip id, the client address and the result line. Run all ten trips if asked.
+7. **If a trip has no reference route** the UI shows "No reference available" and still draws the predicted route; tell the lead before the demo if that happens.
+8. **Afterwards**: stop the servers, remove the firewall rule (section 3), and make sure `git status` shows no evaluator files.
