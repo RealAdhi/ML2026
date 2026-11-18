@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+# raw competition data (not redistributed) and derived caches
+train/
+student_test/
+evaluator_test/
+context/
+data/processed/
+models/experiments/
+# local-only artefacts
+results/monitor.log
+results/models_run.log
+results/models/student_test_predictions_*.pkl
+results/models/mlp_history_*.csv
