@@ -12,9 +12,9 @@ This README is written so that anyone on the team can read it from top to bottom
 4. [Candidates, labels and features](#4-candidates-labels-and-features)
 5. [The five models](#5-the-five-models)
 6. [Model comparison and selection](#6-model-comparison-and-selection)
-7. [Bayesian hyperparameter optimisation](#7-bayesian-hyperparameter-optimisation) (being completed)
-8. [HMM and Viterbi route reconstruction](#8-hmm-and-viterbi-route-reconstruction) (being completed)
-9. [API, UI and end-to-end results](#9-api-ui-and-end-to-end-results) (being completed)
+7. [Bayesian hyperparameter optimisation](#7-bayesian-hyperparameter-optimisation)
+8. [HMM and Viterbi route reconstruction](#8-hmm-and-viterbi-route-reconstruction)
+9. [API, UI and end-to-end results](#9-api-ui-and-end-to-end-results)
 10. [Viva cheat-sheet](#10-viva-cheat-sheet)
 11. [How to run everything](#11-how-to-run-everything)
 
@@ -82,7 +82,9 @@ Trips are never split across partitions.
 │   ├── 06_figures.py          model comparison figures
 │   ├── 07_api_check.py        calls the running API for every served trip
 │   ├── 08_maps.py             Folium prediction maps
-│   └── monitor.py             live pipeline dashboard (http://localhost:8765)
+│   ├── run_api.py             starts the API for the two-laptop demo and prints the addresses
+│   ├── monitor.py             live pipeline dashboard (http://localhost:8765)
+│   └── tui.py                 live progress view in the terminal
 ├── results/
 │   ├── eda/                   inventory CSVs and EDA figures
 │   ├── models/                comparison.csv, cv_folds.csv, mlp_history.csv, predictions
@@ -90,7 +92,9 @@ Trips are never split across partitions.
 │   ├── maps/                  interactive Folium maps (.html)
 │   └── bayes/, hmm/           tuning records and decoder results
 ├── models/final/              the selected model and decoder configuration
-└── docs/                      data_quality.md, how_it_works.md
+├── docs/                      data_quality.md, how_it_works.md
+├── context/                   the event's guideline documents (read these first)
+└── handoffs/                  task guides for teammates
 ```
 
 The raw data folders `train/` and `student_test/` are **not** committed (see section 11).
@@ -365,17 +369,185 @@ We select **XGBoost** for hyperparameter optimisation and for the HMM.
 <!-- SECTION:BAYESIAN_OPTIMISATION -->
 ## 7. Bayesian hyperparameter optimisation
 
-*This section is being completed.*
+We tuned **XGBoost**, the model selected in section 6, with Optuna's TPE sampler (a Bayesian method: it fits a model of which parameter regions gave good scores and proposes new trials there). Code: `scripts/03_bayes_opt.py`. The full search record is committed: `results/bayes/xgboost/study.db` (the Optuna study), `trials.csv`, `best_params.json`, `tuned_vs_untuned.csv`.
+
+**What was searched, and the ranges**
+
+| Hyperparameter | Distribution | Range | Untuned value |
+|---|---|---|---|
+| `n_estimators` (number of trees) | integer, step 50 | 100 to 600 | 300 |
+| `learning_rate` | log-uniform | 0.01 to 0.3 | 0.1 |
+| `max_depth` | integer | 3 to 12 | 6 |
+
+Only these three were searched; `subsample` and `colsample_bytree` stayed at 0.8. We kept the space small because every trial costs five full model fits.
+
+**Objective.** Maximise the mean macro-F1 of 5-fold `GroupKFold` (groups = trips) on the 80 training trips, using the same "pick the top candidate per observation" decision rule as everywhere else. The student-test partition was **not** used by the search. It was used only afterwards to compare tuned and untuned models. The evaluator partition was never touched.
+
+**Trials.** 22 trials completed (the first 8 were random start-up trials, the rest chosen by TPE). 2 more were cut off when we restarted the run to use more CPU cores; they are marked failed in the study and do not count. We planned 20 trials; the run was resumed with three trials in parallel and stopped once 20 had completed, but trials that were already running finished too, so the record contains 22. The search ran from a persistent SQLite study, so the trials of the two sessions are in one record. Wall-clock time of the final session: 36 minutes; single trials took 1.2 to 14.2 minutes depending on the number of trees and the CPU load at that moment.
+
+**Best configuration.** `n_estimators = 350`, `learning_rate = 0.0203`, `max_depth = 10`, CV macro-F1 = 0.91594.
+
+The five best trials:
+
+| Trial | n_estimators | learning_rate | max_depth | CV macro-F1 | Minutes |
+|---|---|---|---|---|---|
+| 1 | 350 | 0.0203 | 10 | 0.91594 | 6.0 |
+| 22 | 400 | 0.0170 | 9 | 0.91582 | 7.4 |
+| 15 | 600 | 0.0183 | 8 | 0.91570 | 10.9 |
+| 19 | 450 | 0.0109 | 12 | 0.91567 | 14.2 |
+| 0 | 550 | 0.0315 | 9 | 0.91553 | 8.5 |
+
+![Optimisation history](results/bayes/xgboost/history.png)
+
+*Each dot is one trial's CV macro-F1, the line is the best score so far. The curve is nearly flat: all 22 trials scored between 0.9110 and 0.9159 (mean 0.9143). The best trial was found early, during the random start-up phase, and TPE did not improve on it. Read this as "XGBoost is not very sensitive to these three parameters on this problem", not as "the search failed".*
+
+**Tuned against untuned** (same folds, same metrics, same partitions; the untuned model uses the configuration from section 5.4)
+
+*The untuned CV macro-F1 here (0.9150) differs in the third decimal from section 6 (0.9153) because this comparison refits both variants in one script with different thread counts; tree-library results depend slightly on thread scheduling. Both variants in this table were fitted the same way.*
+
+| | CV macro-F1 | CV top-1 (reachable) | CV log loss | Student-test top-1 | Student-test macro-F1 | Student-test log loss | Student-test continuity | Inference per 1000 obs | Fit time |
+|---|---|---|---|---|---|---|---|---|---|
+| Untuned | 0.9150 | 0.8529 | 0.0941 | 0.8596 | 0.9213 | 0.0777 | 0.9388 | 29 ms | 54 s |
+| **Tuned** | **0.9159** | **0.8547** | **0.0919** | **0.8601** | **0.9216** | **0.0769** | **0.9408** | 159 ms | 110 s |
+
+![Tuned vs untuned](results/figures/tuned_vs_untuned.png)
+
+**Did tuning help? Yes, but only slightly.**
+* The tuned model is ahead on every quality metric, but the gains are small: CV macro-F1 0.0010, student-test top-1 0.0005, student-test log loss 0.0008 lower.
+* The CV gain is far smaller than the fold-to-fold spread (standard deviation about 0.017). Paired by fold, the tuned model scores higher in 3 of 5 folds (differences: +0.0015, -0.0001, -0.0009, +0.0009, +0.0034).
+* The price is speed: the tuned model has more and deeper trees, so one prediction pass over 1000 observations takes about 159 ms instead of 29 ms and fitting takes 110 s instead of 54 s. In the API this is still small compared with the HMM step (section 9).
+* We use the tuned model as the final model (`models/final/model.joblib`) because it is at least as good on every metric and the cost is acceptable. We do not claim the improvement is statistically meaningful.
 
 <!-- SECTION:HMM_VITERBI -->
 ## 8. HMM and Viterbi route reconstruction
 
-*This section is being completed.*
+Code: `src/pathsnap/hmm.py` (decoder), `src/pathsnap/decode_eval.py` (metrics), `scripts/04_tune_decoder.py` (tuning and comparison). The decoder uses the **tuned XGBoost scores** of section 7, so classifier and HMM are consistent.
+
+**Why we need it.** The classifier scores every observation on its own, so consecutive observations can be assigned to arcs that are not connected in the road network, which gives a jumpy, impossible route. The HMM forces the whole sequence to be physically possible.
+
+**1. What are the hidden states?** For each GPS observation, the hidden state is *which candidate arc the vehicle is on*. The states of observation *t* are exactly the candidate arcs of that observation (at most 12), and each state keeps its arc id, so the decoded path maps straight back to road segments.
+
+**2. How are emission probabilities calculated?** From the classifier. For observation *t* we take the XGBoost probabilities of its candidates, clip them at 1e-4 and normalise them to sum to 1 across the candidates. The emission score is the log of that value times `w_emit` (1.0) minus a small Gaussian distance term, `w_dist * d^2 / (2 * sigma^2)`, where `d` is the metres between the GPS point and the arc.
+
+**3. How are transition probabilities calculated?** In the style of Newson and Krumm. For two consecutive observations and a pair of candidate arcs, we compare the straight-line distance between the two GPS points with the distance a vehicle would have to drive along the road network between the projected positions on the two arcs (a bounded Dijkstra search on the arc graph, limited to the smaller of `3 x straight-line + 150 m` and 3 km). The score is `-w_trans * |straight-line - network distance| / beta`. If the two arcs are the same, the distance is simply how far the projection moved along the arc.
+
+**4. How are missing candidates and large GPS gaps handled?**
+* Every observation has at least one candidate by construction: if no arc lies within 60 m, the single nearest arc is kept, so the decoder never faces an empty state set.
+* If the time between two observations is larger than `gap_s` (tuned to 33.8 s), the transition is made uninformative (all zero), so the path can restart at the best-scoring candidates instead of being forced through a distance comparison that no longer means anything. Network distances are not computed at all for gaps above 60 s.
+
+**5. What happens when consecutive observations suggest disconnected road segments?** If a candidate pair is not reachable within the search limit, it gets a finite penalty `break_pen` (tuned to 19.4) instead of probability zero. That makes such jumps very unlikely but not impossible, so the decoder can still jump when the evidence is overwhelming (for example after a GPS dropout), and it never crashes on a fragmented network. Reversing onto the opposite arc of the same road costs an additional `uturn_pen` (8.0).
+
+**Viterbi recurrence.** `delta_t(j) = emission_t(j) + max_i [ delta_{t-1}(i) + transition(i, j) ]`, with back-pointers; the final path is read backwards from the best last state. All scores are in log space.
+
+**Decoder parameters.** Tuned with Optuna TPE (40 trials, seed 7) to maximise pointwise accuracy on the **out-of-fold** classifier scores of 29 sampled training trips (trips 54 and 33 left out of the objective because their reference routes do not match the GPS, see `docs/data_quality.md`). Using out-of-fold scores means the classifier had not seen those trips, as at test time. Student-test data was used only for reporting.
+
+| Parameter | Tuned value | Meaning |
+|---|---|---|
+| `w_emit` | 1.0 | weight of the classifier log-probability (fixed) |
+| `w_dist` | 0.098 | weight of the Gaussian distance term |
+| `sigma` | 24.6 m | width of the distance term |
+| `beta` | 7.9 m | tolerance for straight-line vs network distance mismatch |
+| `w_trans` | 1.31 | weight of the transition term |
+| `break_pen` | 19.4 | log-penalty for unreachable arc pairs |
+| `uturn_pen` | 8.0 | extra log-penalty for an immediate U-turn |
+| `gap_s` | 33.8 s | time gap above which the transition is ignored |
+
+**6. Did HMM decoding improve the final route?** Yes, clearly. Pointwise accuracy is the share of observations whose predicted arc equals the aligned reference arc. Continuity is the share of consecutive observations whose arcs are the same or head-to-tail adjacent. Route F1 compares the set of predicted arcs with the set of reference route arcs. "Switches" counts how often the predicted arc changes along a trip; the reference route switches 310 times per trip on average on the student-test trips, so a number close to that is realistic.
+
+*Student-test partition (10 trips)*
+
+| Method | Point accuracy | Mean per-trip accuracy | Continuity | Route F1 | Route precision | Route recall | Avg arc switches (reference: 310) |
+|---|---|---|---|---|---|---|---|
+| Classifier only | 0.8601 | 0.8777 | 0.9394 | 0.8612 | 0.8414 | 0.8884 | 538 |
+| Classifier + HMM (default parameters) | 0.8955 | 0.9069 | 0.9734 | 0.9116 | 0.9358 | 0.8917 | 339 |
+| **Classifier + HMM (tuned)** | **0.9307** | 0.9396 | 0.9775 | 0.9330 | 0.9678 | 0.9033 | 321 |
+
+*Training partition, out-of-fold scores (80 trips)*
+
+| Method | Point accuracy | Mean per-trip accuracy | Continuity | Route F1 | Route precision | Route recall | Avg arc switches (reference: 353) |
+|---|---|---|---|---|---|---|---|
+| Classifier only | 0.7615 | 0.8512 | 0.9265 | 0.8401 | 0.8148 | 0.8844 | 744 |
+| Classifier + HMM (default parameters) | 0.8166 | 0.9024 | 0.9663 | 0.9061 | 0.9281 | 0.8909 | 417 |
+| **Classifier + HMM (tuned)** | **0.8329** | 0.9160 | 0.9699 | 0.9212 | 0.9518 | 0.8967 | 401 |
+
+![HMM vs classifier only](results/figures/hmm_vs_classifier.png)
+
+*Left: pointwise accuracy of each student-test trip, classifier only (red) against classifier + HMM (green). Right: route continuity. Green is higher for every trip.*
+
+**Per student-test trip**
+
+| Trip | Obs | Acc: classifier | Acc: + HMM | Change (points) | Continuity: classifier | Continuity: + HMM | Route F1: classifier | Route F1: + HMM |
+|---|---|---|---|---|---|---|---|---|
+| 00000000 | 2503 | 0.9441 | 0.9565 | +1.2 | 0.9716 | 0.9940 | 0.8740 | 0.9425 |
+| 00000007 | 1354 | 0.9158 | 0.9948 | +7.9 | 0.9963 | 0.9993 | 0.9680 | 0.9878 |
+| 00000009 | 1049 | 0.8599 | 0.9142 | +5.4 | 0.8903 | 0.9494 | 0.8412 | 0.8969 |
+| 00000040 | 2995 | 0.9269 | 0.9830 | +5.6 | 0.9743 | 0.9950 | 0.8997 | 0.9770 |
+| 00000052 | 262 | 0.9504 | 0.9924 | +4.2 | 0.9502 | 0.9617 | 0.8571 | 0.9266 |
+| 00000056 | 3958 | 0.8964 | 0.9560 | +6.0 | 0.9065 | 0.9654 | 0.9006 | 0.9386 |
+| 00000065 | 768 | 0.8385 | 0.8776 | +3.9 | 0.9387 | 0.9791 | 0.8400 | 0.9437 |
+| 00000076 | 1486 | 0.8876 | 0.9590 | +7.1 | 0.9077 | 0.9717 | 0.8035 | 0.9083 |
+| 00000077 | 3911 | 0.6842 | 0.8249 | +14.1 | 0.9425 | 0.9887 | 0.8094 | 0.9483 |
+| 00000091 | 874 | 0.8730 | 0.9382 | +6.5 | 0.9164 | 0.9702 | 0.8180 | 0.8599 |
+
+**What the numbers say**
+* The decoder raises student-test point accuracy from 0.8601 to 0.9307 and continuity from 0.9394 to 0.9775. Route precision rises most (0.8414 to 0.9678) because the classifier alone sprinkles in many wrong arcs that the HMM removes.
+* The number of arc switches falls from 538 to 321 per trip, close to the reference's 310: the classifier-only route flickers between neighbouring arcs, the HMM route does not.
+* Even the default decoder parameters help a lot (student-test accuracy 0.8955); tuning adds a further 3.5 points. The tuned parameters were chosen on training data only and the gain is at least as large on the untouched student-test trips (3.5 points) as on the training trips (1.6 points), so we see no sign of the decoder overfitting its tuning set.
+
+**Where HMM decoding helped little or not at all**
+* On the student-test trips accuracy improved for all 10 trips, but unevenly. The largest gain is trip 00000077 (+14.1 points); the smallest is trip 00000000 (+1.2 points), where the classifier was already at 0.9441.
+* Trip 00000009 still has the lowest HMM continuity (0.9494).
+* On the 80 training trips (out-of-fold scores) the HMM made pointwise accuracy *worse* on 2 trips: trip 00000057 (-3.4 points, 1645 observations); trip 00000063 (-0.5 points, 2781 observations). Accuracy improved on 77 of the 80 training trips (median gain +5.6 points). In both trips where it fell, continuity still rose (trip 00000057: 0.9647 to 0.9866, trip 00000063: 0.9655 to 0.9802): the route became more connected but some points moved to a different arc than the reference. We have not examined those two trips in detail.
+* Trip 00000077 shows the limit of the approach: the HMM lifts accuracy by 14.1 points but it remains the weakest trip at 0.8249. We have not yet investigated why; likely candidates are duplicate or two-way arcs with identical geometry, which neither the classifier nor the transition can separate. We did not test this explanation.
+
+Interactive maps of three student-test trips (GPS points, nearby road arcs, reference route, classifier-only and classifier + HMM routes, with layer control) are in `results/maps/`: `pred_student_00000007.html` (an easy trip), `pred_student_00000009.html` and `pred_student_00000040.html`. They are interactive HTML files, so download and open them in a browser; they are generated by `scripts/08_maps.py`.
 
 <!-- SECTION:API_UI_RESULTS -->
 ## 9. API, UI and end-to-end results
 
-*This section is being completed.*
+**Architecture (two laptops, as the rules require).** Laptop 1 runs the FastAPI backend (`api/main.py`): the final model, the decoder, the road-network files and the reference routes. Laptop 2 runs the UI (`ui/`, static HTML and JavaScript with Leaflet). The UI only knows a trip id; everything else happens on Laptop 1.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | status, model name, number of trips served, data folder |
+| `GET /trips` | the trips that can be selected (id and number of GPS points) |
+| `POST /predict` with `{"trip_id": "..."}` | runs the full pipeline for that trip and returns the GPS points, the predicted route, the classifier-only route and the metrics |
+
+**Pipeline behind `POST /predict`:** read the raw trip files **without the reference route** (`load_trip(..., with_route=False)` in `src/pathsnap/pipeline.py`), generate candidates and features, score them with the tuned XGBoost model, run Viterbi decoding, and only then call `src/pathsnap/scoring.py`, which loads the reference route on the server, aligns it and computes accuracy, continuity and route F1.
+
+**Ground truth stays on the server.** The prediction code never opens the `.route` file, and the response contains only aggregate metrics, never the reference route. An automated check that no reference field appears in the response is being written as part of `handoffs/HANDOFF_3_Tests_and_Demo_Runbook.md`; until it is merged, this is verified only by reading `api/main.py`. Nothing is hard-coded: the route is computed from the raw files on every request, and each request is logged.
+
+**End-to-end result on all ten student-test trips** (`scripts/07_api_check.py` calling the running API; `results/api_check.csv`). The evaluator trips are not available to us, so this is the stand-in for the demo.
+
+| Trip | Obs | Acc: classifier | Acc: + HMM | Continuity: classifier | Continuity: + HMM | Route F1 (HMM) | Server time (s) |
+|---|---|---|---|---|---|---|---|
+| 00000000 | 2503 | 0.9441 | 0.9565 | 0.9716 | 0.9940 | 0.9425 | 1.55 |
+| 00000007 | 1354 | 0.9158 | 0.9948 | 0.9963 | 0.9993 | 0.9878 | 0.63 |
+| 00000009 | 1049 | 0.8599 | 0.9142 | 0.8903 | 0.9494 | 0.8969 | 1.60 |
+| 00000040 | 2995 | 0.9269 | 0.9830 | 0.9743 | 0.9950 | 0.9770 | 1.78 |
+| 00000052 | 262 | 0.9504 | 0.9924 | 0.9502 | 0.9617 | 0.9266 | 0.27 |
+| 00000056 | 3958 | 0.8964 | 0.9560 | 0.9065 | 0.9654 | 0.9386 | 2.22 |
+| 00000065 | 768 | 0.8385 | 0.8776 | 0.9387 | 0.9791 | 0.9437 | 0.50 |
+| 00000076 | 1486 | 0.8876 | 0.9590 | 0.9077 | 0.9717 | 0.9083 | 1.24 |
+| 00000077 | 3911 | 0.6842 | 0.8249 | 0.9425 | 0.9887 | 0.9483 | 2.28 |
+| 00000091 | 874 | 0.8730 | 0.9382 | 0.9164 | 0.9702 | 0.8599 | 0.62 |
+
+Server time per request: mean 1.27 s, maximum 2.28 s (a 3,958-observation trip). The observation-weighted accuracy over the ten trips is 0.9307 with the HMM and 0.8601 without. These match section 8, as they must: the API runs the same code.
+
+**What the evaluator sees in the API window on Laptop 1** (a real excerpt from our test run; the client address is the machine that sent the request):
+
+```
+2026-11-18 12:13:32,252 INFO GET /trips from 10.30.204.82 -> 10 trips
+2026-11-18 12:13:36,740 INFO POST /predict trip_id=00000040 from 10.30.204.82
+2026-11-18 12:13:37,852 INFO trip=00000040 obs=2995 hmm_acc=0.9830 clf_acc=0.9269 continuity=0.9950 time=1.11s
+INFO:     10.30.204.82:58250 - "POST /predict HTTP/1.1" 200 OK
+```
+
+**The UI.** After connecting, it lists the trips. Clicking a trip sends its id to the API and then draws the GPS points, the HMM route (green) and the classifier-only arcs (red, dashed) on a map with a layer control and legend, and shows point accuracy, continuity, route F1, precision and recall for classifier-only against classifier + HMM, plus the server time. The reference route is deliberately not drawn.
+
+**Running it across two devices** is described in section 11. `python scripts/run_api.py` starts the API on all network interfaces and prints the exact addresses Laptop 2 needs.
+
+**What we have and have not verified.** We tested the API and UI together on one machine, including through the machine's network address, and all ten trips worked. A test with a real second laptop (firewall, Wi-Fi) is still to be done and documented with screenshots in `docs/screenshots/`; those screenshots belong in the report's API/UI section.
 
 ---
 
@@ -440,13 +612,13 @@ python scripts/05_eda_plots.py        # EDA figures and Folium EDA maps
 python scripts/05b_extra_eda.py       # nearest-arc baseline, speed/gap, candidate-miss figures
 python scripts/02_compare_models.py   # five models, group CV, student-test (add --models NAME --tag NAME to run one model; run several in parallel)
 python scripts/02b_merge_results.py   # only needed if you ran models separately with --tag
-python scripts/03_bayes_opt.py --model xgboost --trials 20 --final   # Bayesian optimisation, writes models/final/
-python scripts/04_tune_decoder.py     # HMM decoder tuning and comparison
+python scripts/03_bayes_opt.py --model xgboost --trials 20 --parallel 3 --final   # Bayesian optimisation, writes models/final/ (we used 3 parallel trials, which ended with 22 completed)
+python scripts/04_tune_decoder.py --model xgboost --trials 40   # HMM decoder tuning and comparison (updates models/final/decoder.json)
 python scripts/06_figures.py          # model comparison figures
 python scripts/08_maps.py             # Folium prediction maps for student-test trips
 ```
 
-`scripts/monitor.py` starts a local dashboard at http://localhost:8765 that shows the progress of running jobs.
+`scripts/monitor.py` starts a local dashboard at http://localhost:8765 and `scripts/tui.py` shows the same progress in the terminal.
 
 **Start the API (Laptop 1)** from the repository root:
 
@@ -454,6 +626,8 @@ python scripts/08_maps.py             # Folium prediction maps for student-test 
 # Windows PowerShell:  $env:EVAL_DATA_DIR="student_test"; $env:MODEL_DIR="models/final"
 # macOS/Linux:         export EVAL_DATA_DIR=student_test MODEL_DIR=models/final
 uvicorn api.main:app --host 0.0.0.0 --port 8000
+# or, simpler, this also prints the addresses to use on Laptop 2:
+python scripts/run_api.py            # add --data C:/path/to/evaluator_folder to serve other trips
 ```
 
 * `EVAL_DATA_DIR`: folder with the trips to serve (default `student_test`). For the final evaluation point it at the evaluator trips, in the same file layout; nothing from it is committed.
