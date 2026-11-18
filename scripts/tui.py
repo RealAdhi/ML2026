@@ -113,17 +113,11 @@ def render():
                  ProgressBar(total=100, completed=st["mem_pct"], width=len(cpu), complete_style="cyan"),
                  Text(f"{st['mem_gb']} / {st['mem_total']} GB"))
 
-    chain = []
-    cp = os.path.join(monitor.RES, "chain.log")
-    if os.path.exists(cp):
-        chain = [l for l in open(cp, errors="ignore").read().splitlines() if l.startswith("[chain]")][-4:]
     head = Text.assemble((f" {cnt['done']}/{n} stages complete ", "bold green"), ("  "), (f"{cnt['running']} running ", "bold yellow"),
                          ("  "), (f"{cnt['failed']} failed ", "bold red" if cnt["failed"] else "dim"), ("  "),
                          (time.strftime("%H:%M:%S"), "dim"))
     total_bar = ProgressBar(total=n, completed=cnt["done"], width=None, complete_style="green", finished_style="green")
     parts = [head, total_bar, Text(""), tbl, Text(""), sysg]
-    if chain:
-        parts += [Text(""), Text("pipeline chain:", style="bold dim")] + [Text("  " + c, style="dim") for c in chain]
     return Panel(Group(*parts), title="[bold]PathSnap pipeline[/bold]", subtitle="Ctrl+C to quit", border_style="cyan")
 
 

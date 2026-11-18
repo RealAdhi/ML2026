@@ -21,3 +21,4 @@ results/bayes/*/student_test_*.pkl
 .pytest_cache/
 results/models/comparison_*.csv
 results/models/cv_folds_*.csv
+results/demo_server.log

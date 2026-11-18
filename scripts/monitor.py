@@ -196,13 +196,14 @@ def build_jobs():
         test = dict(f1=float(t[1]), top1=float(t[2]), ll=float(t[3]), cont=float(t[4])) if t else None
         epochs = [(int(a), float(b), float(c)) for a, b, c in EPOCH.findall(log)]
         csvp = os.path.join(RES, "models", f"comparison_{k}.csv")
-        done = os.path.exists(csvp)
+        merged = read_csv_rows(os.path.join(RES, "models", "comparison.csv"))      # consolidated table written by 02b
+        done = os.path.exists(csvp) or any(r.get("model") == k for r in merged)
         failed = "Traceback" in log and f"model:{k}" not in live and not done
         state = "running" if f"model:{k}" in live else "done" if done else "failed" if failed else "waiting"
         pct = 100 if done else min(96, round(len(folds) / 6 * 100))
         ri = run_info(f"model:{k}")
         if not ri and os.path.exists(os.path.join(RES, f"run_{k}.log")) and done:
-            ri = dict(elapsed=int(os.path.getmtime(csvp) - os.path.getctime(os.path.join(RES, f"run_{k}.log"))))
+            ri = dict(elapsed=int(os.path.getmtime(os.path.join(RES, f"run_{k}.log")) - os.path.getctime(os.path.join(RES, f"run_{k}.log"))))
         jobs.append(job(f"model:{k}", name, "model", state, folds=folds, test=test, epochs=epochs, pct=pct,
                         error=log.strip().splitlines()[-1][:200] if failed else None,
                         detail="5-fold GroupKFold by trip, then refit and student-test", **ri))
