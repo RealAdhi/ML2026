@@ -37,6 +37,18 @@ if __name__ == "__main__":
     env = dict(os.environ)
     if a.data:
         env["EVAL_DATA_DIR"] = os.path.abspath(a.data)
+    data_dir = env.get("EVAL_DATA_DIR", os.path.join(ROOT, "student_test"))
+    need = ("track", "nodes", "arcs", "route")
+    trips = [d for d in sorted(os.listdir(data_dir)) if os.path.isdir(os.path.join(data_dir, d))] if os.path.isdir(data_dir) else []
+    broken = [d for d in trips if not all(os.path.exists(os.path.join(data_dir, d, f"{d}.{e}")) for e in need)]
+    if not trips or broken:
+        print("CANNOT START: the data folder is not usable.")
+        print("  folder :", data_dir)
+        print("  trips  :", len(trips), "found" + (f", {len(broken)} incomplete (first: {broken[0]})" if broken else ""))
+        print("  each trip needs <id>/<id>.track, .nodes, .arcs and .route inside the folder.")
+        print("  fix: copy the trips there (student_test/ for a rehearsal) or pass --data <folder with the trips>.")
+        sys.exit(1)
+    print(f"  data check: {len(trips)} trips, all files present")
     print("=" * 66)
     print(" PathSnap API  (Laptop 1)   serving:", env.get("EVAL_DATA_DIR", os.path.join(ROOT, "student_test")))
     for ip in lan_ips():
