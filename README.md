@@ -161,7 +161,7 @@ Each map has toggleable layers: GPS observations, the road network near the trac
 
 `.route` lists arcs in order. It does not say which arc each GPS point belongs to. We therefore **derive** a per-point label by a monotone dynamic programme that assigns every fix to a route arc (cost = distance to the arc, moving backwards along the route is heavily penalised). Labels are derived, not given.
 
-For most trips the trace sits on the reference route: across the 80 training trips the median fix-to-reference distance is about 4 to 6 m for typical trips (median of the per-trip medians 4.6 m, 95th percentile about 14 m). A handful of trips do not fit:
+For most trips the trace sits on the reference route: across the 80 training trips the median fix-to-reference distance is about 4 to 6 m for typical trips (median of the per-trip medians 4.6 m; the typical trip's own 95th-percentile distance is about 14 m, computed as the median over trips of each trip's 95th percentile; the 95th percentile of the per-trip medians is 7.8 m). A handful of trips do not fit:
 
 ![GPS to reference distance](results/eda/gps_to_reference.png)
 
