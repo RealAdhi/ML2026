@@ -90,12 +90,23 @@ t_start = time.time()
 study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=42, n_startup_trials=8),
                             study_name="pathsnap_" + args.model, storage="sqlite:///" + os.path.join(out, "study.db").replace("\\", "/"),
                             load_if_exists=True)   # every finished trial is persisted
-study.optimize(objective, n_trials=max(args.trials - len(study.trials), 0), n_jobs=args.parallel)  # parallel trials (TPE is asynchronous-safe)
+from optuna.trial import TrialState
+for t in study.get_trials(deepcopy=False):          # trials left RUNNING by an interrupted earlier run
+    if t.state == TrialState.RUNNING:
+        study._storage.set_trial_state_values(t._trial_id, TrialState.FAIL)
+
+
+def stop_when_enough(st, _trial):
+    if sum(t.state == TrialState.COMPLETE for t in st.get_trials(deepcopy=False)) >= args.trials:
+        st.stop()
+
+
+study.optimize(objective, n_trials=args.trials * 2, n_jobs=args.parallel, callbacks=[stop_when_enough])
 search_time = time.time() - t_start
 study.trials_dataframe().to_csv(os.path.join(out, "trials.csv"), index=False)
 best = study.best_params
 json.dump({"model": args.model, "best_params": best, "best_cv_macro_f1": study.best_value,
-           "n_trials": len(study.trials), "search_time_s": search_time, "sampler": "TPE (Optuna), seed 42, 8 startup trials",
+           "n_trials": sum(t.state == TrialState.COMPLETE for t in study.trials), "search_time_s": search_time, "sampler": "TPE (Optuna), seed 42, 8 startup trials",
            "objective": "5-fold GroupKFold mean macro-F1 (top-1 decision rule, reachable observations)"},
           open(os.path.join(out, "best_params.json"), "w"), indent=2)
 print("best", best, study.best_value, flush=True)

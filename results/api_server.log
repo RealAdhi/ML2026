@@ -1,0 +1,39 @@
+2026-11-18 12:11:25,352 INFO model=xgboost data_dir=C:\Users\adhithya\REPOS\ML_proj26\student_test trips=10
+INFO:     Started server process [15744]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63601 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63609 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51517 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51522 - "GET /trips HTTP/1.1" 200 OK
+2026-11-18 12:11:34,879 INFO POST /predict trip_id=00000000
+2026-11-18 12:11:36,734 INFO trip=00000000 obs=2503 hmm_acc=0.9565 clf_acc=0.9441 continuity=0.9940 time=1.86s
+INFO:     127.0.0.1:57644 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:38,813 INFO POST /predict trip_id=00000007
+2026-11-18 12:11:39,562 INFO trip=00000007 obs=1354 hmm_acc=0.9948 clf_acc=0.9158 continuity=0.9993 time=0.75s
+INFO:     127.0.0.1:57646 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:41,630 INFO POST /predict trip_id=00000009
+2026-11-18 12:11:43,425 INFO trip=00000009 obs=1049 hmm_acc=0.9142 clf_acc=0.8599 continuity=0.9494 time=1.80s
+INFO:     127.0.0.1:49216 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:45,518 INFO POST /predict trip_id=00000040
+2026-11-18 12:11:47,729 INFO trip=00000040 obs=2995 hmm_acc=0.9830 clf_acc=0.9269 continuity=0.9950 time=2.21s
+INFO:     127.0.0.1:54879 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:49,829 INFO POST /predict trip_id=00000052
+2026-11-18 12:11:50,153 INFO trip=00000052 obs=262 hmm_acc=0.9924 clf_acc=0.9504 continuity=0.9617 time=0.32s
+INFO:     127.0.0.1:59135 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:52,205 INFO POST /predict trip_id=00000056
+2026-11-18 12:11:54,985 INFO trip=00000056 obs=3958 hmm_acc=0.9560 clf_acc=0.8964 continuity=0.9654 time=2.78s
+INFO:     127.0.0.1:56136 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:57,068 INFO POST /predict trip_id=00000065
+2026-11-18 12:11:57,624 INFO trip=00000065 obs=768 hmm_acc=0.8776 clf_acc=0.8385 continuity=0.9791 time=0.56s
+INFO:     127.0.0.1:52604 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:11:59,677 INFO POST /predict trip_id=00000076
+2026-11-18 12:12:01,094 INFO trip=00000076 obs=1486 hmm_acc=0.9590 clf_acc=0.8876 continuity=0.9717 time=1.42s
+INFO:     127.0.0.1:63337 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:12:03,141 INFO POST /predict trip_id=00000077
+2026-11-18 12:12:05,626 INFO trip=00000077 obs=3911 hmm_acc=0.8249 clf_acc=0.6842 continuity=0.9887 time=2.48s
+INFO:     127.0.0.1:63339 - "POST /predict HTTP/1.1" 200 OK
+2026-11-18 12:12:07,773 INFO POST /predict trip_id=00000091
+2026-11-18 12:12:08,470 INFO trip=00000091 obs=874 hmm_acc=0.9382 clf_acc=0.8730 continuity=0.9702 time=0.70s
+INFO:     127.0.0.1:65213 - "POST /predict HTTP/1.1" 200 OK

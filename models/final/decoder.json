@@ -1,0 +1,49 @@
+{
+  "model_name": "xgboost",
+  "features": [
+    "d",
+    "d_rank",
+    "d_rel",
+    "d_ratio",
+    "frac",
+    "arc_len",
+    "d_to_start",
+    "d_to_end",
+    "cos_h",
+    "abs_ang",
+    "cos_h_prev",
+    "cos_h_next",
+    "speed",
+    "step_prev",
+    "step_next",
+    "dt_prev",
+    "dt_next",
+    "deg_from",
+    "deg_to",
+    "outdeg_to",
+    "has_reverse",
+    "n_cands",
+    "n_dir_ok",
+    "d_prev",
+    "d_next",
+    "dprog_ok",
+    "min_d_dir_ok",
+    "d_vs_best_dir"
+  ],
+  "model_params": {
+    "n_estimators": 350,
+    "learning_rate": 0.020278888506639208,
+    "max_depth": 10
+  },
+  "decoder_params": {
+    "w_emit": 1.0,
+    "w_dist": 0.09790453719825609,
+    "sigma": 24.560097272513193,
+    "beta": 7.890008358952053,
+    "w_trans": 1.313574782387415,
+    "break_pen": 19.368487342322954,
+    "uturn_pen": 8.004659395622454,
+    "gap_s": 33.84964301599993,
+    "eps": 0.0001
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "model": "xgboost",
+  "best_params": {
+    "n_estimators": 350,
+    "learning_rate": 0.020278888506639208,
+    "max_depth": 10
+  },
+  "best_cv_macro_f1": 0.9159393634357773,
+  "n_trials": 22,
+  "search_time_s": 2155.2621126174927,
+  "sampler": "TPE (Optuna), seed 42, 8 startup trials",
+  "objective": "5-fold GroupKFold mean macro-F1 (top-1 decision rule, reachable observations)"
+}
