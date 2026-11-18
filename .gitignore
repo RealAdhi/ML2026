@@ -5,7 +5,6 @@ __pycache__/
 train/
 student_test/
 evaluator_test/
-context/
 data/processed/
 models/experiments/
 # local-only artefacts
