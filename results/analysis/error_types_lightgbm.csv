@@ -1,0 +1,7 @@
+error_type,count,percentage
+correct,16454,85.87682672233821
+reverse_direction,1234,6.440501043841336
+adjacent_arc,907,4.733820459290188
+other,526,2.7453027139874737
+candidate_miss,39,0.2035490605427975
+duplicate_arc,0,0.0
