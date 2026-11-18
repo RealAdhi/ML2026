@@ -1,0 +1,10 @@
+train rows 1484604 fit rows 1427167 test rows 160114
+===  LightGBM
+  fold 0: macroF1=0.9086 top1(reach)=0.8432 ll=0.1189 cont=0.945 t=41s
+  fold 1: macroF1=0.9216 top1(reach)=0.8623 ll=0.0856 cont=0.929 t=44s
+  fold 2: macroF1=0.9422 top1(reach)=0.8987 ll=0.0703 cont=0.926 t=47s
+  fold 3: macroF1=0.8886 top1(reach)=0.8030 ll=0.1071 cont=0.922 t=46s
+  fold 4: macroF1=0.9029 top1(reach)=0.8344 ll=0.1190 cont=0.928 t=49s
+  TEST: macroF1=0.9189 top1=0.8554 ll=0.0838 cont=0.930
+    display  cv_macro_f1_mean  cv_top1_reach  test_macro_f1  test_top1_all  test_log_loss  test_route_continuity  train_time_s
+0  LightGBM          0.912787       0.848327       0.918856       0.855376       0.083764               0.930183     59.639867

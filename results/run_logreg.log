@@ -1,0 +1,10 @@
+train rows 1484604 fit rows 1427167 test rows 160114
+===  Logistic Regression
+  fold 0: macroF1=0.9002 top1(reach)=0.8287 ll=0.1464 cont=0.942 t=26s
+  fold 1: macroF1=0.9091 top1(reach)=0.8403 ll=0.1166 cont=0.918 t=24s
+  fold 2: macroF1=0.9318 top1(reach)=0.8805 ll=0.0965 cont=0.916 t=21s
+  fold 3: macroF1=0.8801 top1(reach)=0.7880 ll=0.1306 cont=0.905 t=23s
+  fold 4: macroF1=0.8887 top1(reach)=0.8102 ll=0.1500 cont=0.922 t=18s
+  TEST: macroF1=0.9103 top1=0.8404 ll=0.1091 cont=0.926
+               display  cv_macro_f1_mean  cv_top1_reach  test_macro_f1  test_top1_all  test_log_loss  test_route_continuity  train_time_s
+0  Logistic Regression          0.901965       0.829521       0.910331       0.840397       0.109128                0.92564     22.180372

@@ -1,0 +1,10 @@
+train rows 1484604 fit rows 1427167 test rows 160114
+===  Random Forest
+  fold 0: macroF1=0.9095 top1(reach)=0.8446 ll=0.1087 cont=0.949 t=262s
+  fold 1: macroF1=0.9215 top1(reach)=0.8620 ll=0.0837 cont=0.925 t=191s
+  fold 2: macroF1=0.9430 top1(reach)=0.9002 ll=0.0648 cont=0.927 t=163s
+  fold 3: macroF1=0.8897 top1(reach)=0.8050 ll=0.1014 cont=0.921 t=236s
+  fold 4: macroF1=0.9052 top1(reach)=0.8384 ll=0.1127 cont=0.929 t=250s
+  TEST: macroF1=0.9200 top1=0.8575 ll=0.0793 cont=0.932
+         display  cv_macro_f1_mean  cv_top1_reach  test_macro_f1  test_top1_all  test_log_loss  test_route_continuity  train_time_s
+0  Random Forest          0.913789       0.850059       0.920044       0.857463        0.07926                0.93154    360.442063

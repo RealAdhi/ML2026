@@ -1,0 +1,10 @@
+train rows 1484604 fit rows 1427167 test rows 160114
+===  XGBoost
+  fold 0: macroF1=0.9117 top1(reach)=0.8484 ll=0.1089 cont=0.955 t=94s
+  fold 1: macroF1=0.9235 top1(reach)=0.8656 ll=0.0825 cont=0.935 t=77s
+  fold 2: macroF1=0.9445 top1(reach)=0.9027 ll=0.0620 cont=0.935 t=67s
+  fold 3: macroF1=0.8922 top1(reach)=0.8095 ll=0.1013 cont=0.934 t=73s
+  fold 4: macroF1=0.9045 top1(reach)=0.8371 ll=0.1166 cont=0.934 t=45s
+  TEST: macroF1=0.9228 top1=0.8623 ll=0.0774 cont=0.940
+   display  cv_macro_f1_mean  cv_top1_reach  test_macro_f1  test_top1_all  test_log_loss  test_route_continuity  train_time_s
+0  XGBoost           0.91528       0.852672       0.922776       0.862265       0.077401               0.939948     53.134329
