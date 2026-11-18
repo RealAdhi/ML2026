@@ -93,6 +93,8 @@ def scan_processes():
             key = "api"
         elif script in ("monitor.py", "tui.py"):
             continue
+        elif script == "run_api.py":
+            key = "api"
         elif script == "02_compare_models.py":
             key = f"model:{args.get('models', 'all').split(',')[0]}"
         elif script == "03_bayes_opt.py":
